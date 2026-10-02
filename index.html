@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>廚房食材倉存</title>
+<script src="https://unpkg.com/@zxing/library@latest"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:system-ui}
+body{padding:12px;background:#f5f7fa;font-size:16px}
+.box{background:#fff;padding:14px;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 3px #0002}
+h2{margin-bottom:10px;font-size:18px}
+input{width:100%;padding:10px;margin:6px 0;border:1px solid #ccc;border-radius:6px;font-size:16px}
+button{padding:10px 14px;border:none;border-radius:6px;background:#2563eb;color:white;margin:4px;font-size:16px}
+button.del{background:#dc2626}
+#reader{width:100%;max-width:450px;margin:8px 0}
+.item{border-bottom:1px solid #eee;padding:10px 0}
+.warn{color:#dc2626;font-weight:bold}
+</style>
+</head>
+<body>
+
+<div class="box">
+  <h2>📷 掃描條碼 / QR Code</h2>
+  <button id="startScan">開啟掃描相機</button>
+  <button id="stopScan">停止掃描</button>
+  <div id="reader"></div>
+  <div>掃描結果：<span id="scanResult">—</span></div>
+</div>
+
+<div class="box">
+  <h2>📦 新增食材</h2>
+  <input placeholder="條碼/QR編號" id="barcode">
+  <input placeholder="食材名稱" id="name">
+  <input placeholder="數量" type="number" id="count">
+  <input placeholder="存放位置(雪櫃/櫃桶等)" id="place">
+  <input type="date" id="inDate">
+  <input type="date" id="expDate">
+  <button id="addBtn">新增入倉</button>
+</div>
+
+<div class="box">
+  <h2>📋 食材清單</h2>
+  <div id="list"></div>
+</div>
+
+<script>
+const codeReader = new ZXing.BrowserMultiFormatReader();
+const $=s=>document.querySelector(s);
+let listData=JSON.parse(localStorage.getItem("kitchenStore")||"[]");
+
+// 掃碼
+$("#startScan").onclick=async()=>{
+  try{
+    await codeReader.decodeFromVideoDevice(null,"reader",(res)=>{
+      if(res){
+        $("#scanResult").textContent=res.text;
+        $("#barcode").value=res.text;
+      }
+    })
+  }catch(e){alert("無法開啟相機，本機檔案無法使用，請部署到Github Pages");console.error(e)}
+}
+$("#stopScan").onclick=()=>codeReader.reset();
+
+//渲染列表
+function render(){
+  $("#list").innerHTML="";
+  listData.forEach((it,idx)=>{
+    const now=new Date();
+    const exp=new Date(it.expDate);
+    const isWarn=exp<now;
+    const div=document.createElement("div");
+    div.className="item";
+    div.innerHTML=`
+      <div class="${isWarn?'warn':''}">
+        <div><b>${it.name||"未命名"}</b></div>
+        <div>條碼:${it.barcode||""}</div>
+        <div>數量:${it.count}</div>
+        <div>位置:${it.place}</div>
+        <div>入倉:${it.inDate}</div>
+        <div>到期:${it.expDate} ${isWarn?"⚠️已過期":""}</div>
+        <button class="del" data-i="${idx}">刪除</button>
+      </div>
+    `;
+    $("#list").appendChild(div);
+  })
+  localStorage.setItem("kitchenStore",JSON.stringify(listData));
+}
+
+//新增
+$("#addBtn").onclick=()=>{
+  const item={
+    barcode:$("#barcode").value.trim(),
+    name:$("#name").value.trim(),
+    count:$("#count").value,
+    place:$("#place").value.trim(),
+    inDate:$("#inDate").value,
+    expDate:$("#expDate").value
+  };
+  listData.push(item);
+  //清空輸入框
+  $("#barcode").value="";$("#name").value="";$("#count").value="";
+  $("#place").value="";$("#inDate").value="";$("#expDate").value="";
+  $("#scanResult").textContent="—";
+  render();
+}
+
+//刪除
+$("#list").addEventListener("click",e=>{
+  if(e.target.classList.contains("del")){
+    const i=Number(e.target.dataset.i);
+    listData.splice(i,1);
+    render();
+  }
+})
+
+//初始化今日日期
+const today=new Date().toISOString().split("T")[0];
+$("#inDate").value=today;
+render();
+</script>
+</body>
+</html>
